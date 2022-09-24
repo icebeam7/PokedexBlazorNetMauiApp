@@ -1,0 +1,118 @@
+﻿<!--The page directive here specifies that it takes the PokemonName as a parameter-->
+@page "/pokemon/{PokemonName}"
+
+@using Microsoft.AspNetCore.Components;
+@using PokeApiNet;
+@using System;
+@using System.Collections.Generic;
+@using System.Linq;
+@using System.Threading.Tasks;
+
+@inject IJSRuntime JS
+
+<!--The onclick attribute here specifies the Method to run in the code-behind file-->
+<button class="btn btn-danger" @onclick="GoBackToListPage">Back</button>
+ 
+<!--If the data hasn't been loaded yet, we just show a loading spinner-->
+@if (Pokemon == null)
+{
+    <div class="spinner-border text-danger" role="status">
+    </div>
+}
+else
+{
+    <h1>@Pokemon.Name</h1>
+    <!-- display the front and back images of the Pokemon-->
+    <div class="row">
+        <img src="@Pokemon.Sprites.FrontDefault">
+        <img src="@Pokemon.Sprites.BackDefault">
+    </div>
+    <div class="row">
+        <div class="col-6">
+            <!--List the types of the Pokemon-->
+            <strong>Types: </strong>
+            @foreach (var type in Pokemon.Types)
+            {
+                <span class="badge rounded-pill bg-warning">@type.Type.Name</span>
+            }
+            <!--List the stats of the Pokemon-->
+            <strong style="display:block">Stats:</strong>
+            <table class="table">
+                @foreach (var stat in Pokemon.Stats)
+                {
+                    <tr>
+                        <td>@stat.Stat.Name</td>
+                        <td>@stat.BaseStat</td>
+                    </tr>
+                }
+            </table>
+            <!--List the moves of the Pokemon-->
+            <strong style="display:block">Moves:</strong>
+            <ul class="list-group">
+                @foreach (var move in Pokemon.Moves)
+                {
+                    <li class="list-group-item">@move.Move.Name</li>
+                }
+            </ul>
+        </div>
+        <div class="col-6">
+            <!--Display the description of the Pokemon-->
+            <strong>Description:</strong>
+            @foreach (var description in PokemonDescriptions)
+            {
+                <p>@description</p>
+            }
+        </div>
+    </div>
+}
+
+@code{
+    //PokemonName is passed as a parameter to this component when it is created
+    [Parameter]
+    public string PokemonName { get; set; }
+
+    //This injects the PokeClient from the dependency injection container
+    [Inject]
+    PokeApiClient PokeClient { get; set; }
+
+    //This injects the NavigationManager class which allows us to navigate to a different page
+    [Inject]
+    NavigationManager NavigationManager { get; set; }
+
+    //This serves as the main data model for the page
+    private Pokemon Pokemon;
+
+    //This is also used as data for the page and contains a set of descriptive paragraphs.
+    private HashSet<string> PokemonDescriptions = new HashSet<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Connectivity.Current.NetworkAccess == NetworkAccess.Internet)
+        {
+            //Create a task for retrieving the basic Pokemon details
+            var pokemonTask = PokeClient.GetResourceAsync<Pokemon>(PokemonName);
+
+            //Retrieve additional details about the Pokemon from the API including descriptions
+            var pokemonSpecies = await PokeClient.GetResourceAsync<PokemonSpecies>(PokemonName);
+            Pokemon = await pokemonTask;
+
+            //We filter out just the english descriptions
+            //Also we replace a special character appearing in the descriptions with a space.
+            pokemonSpecies.FlavorTextEntries.Where(f => f.Language.Name == "en")
+                .ToList().ForEach(f => PokemonDescriptions.Add(f.FlavorText.Replace("\f", " ")));
+        }
+        else
+        {
+            await App.Current.MainPage.DisplayAlert("Error",
+                "Internet connection required", "OK");
+
+            await JS.InvokeVoidAsync("goBack");
+        }
+    }
+
+    //This method is used to navigate back to the Pokemon list page after clicking a button
+    void GoBackToListPage()
+    {
+        NavigationManager.NavigateTo("pokemon");
+    }
+}

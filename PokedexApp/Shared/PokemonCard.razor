@@ -1,0 +1,35 @@
+﻿@inject NavigationManager NavigationManager
+@using PokeApiNet
+ 
+<!-- If the Pokemon is null, return a blank card-->
+@if (Pokemon == null)
+{
+    <div class="card" style="border:none"></div>
+}
+else
+{
+    <div class="card" @onclick="NavigateToDetails" style="cursor:pointer">
+        <img class="card-img-top"
+             src="@Pokemon.Sprites.FrontDefault"
+             style="height:96px;width:96px;margin-left: auto; margin-right: auto;display: block;">
+        <div class="card-body">
+            <h5 class="card-title"
+                style="margin-left: auto; margin-right: auto; display: block;">
+                <b>@Pokemon.Id</b> @Pokemon.Name
+            </h5>
+        </div>
+    </div>
+}
+ 
+@code {
+    //This is the model used for data binding in the markup above
+    //The Parameter attribute indicates that this property is passed to the component during creation
+    [Parameter]
+    public Pokemon Pokemon { get; set; }
+
+    void NavigateToDetails()
+    {
+        NavigationManager.NavigateTo($"pokemon/{Pokemon.Name}");
+    }
+
+}

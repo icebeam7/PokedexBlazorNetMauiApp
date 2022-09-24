@@ -1,0 +1,133 @@
+﻿@page "/pokemon"
+
+@using Microsoft.AspNetCore.Components;
+@using PokeApiNet;
+@using System;
+@using System.Collections.Generic;
+@using System.Linq;
+@using System.Threading.Tasks;
+
+<div class="row">
+    <div class="offset-4 col-2">
+        @if (CurrentPage > 1)
+        {
+                <button class="btn btn-danger " @onclick="LoadPreviousPage" disabled="@LoadingPreviousPage">
+                @if (LoadingPreviousPage)
+                {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                }
+                    Previous
+                </button>
+        }
+    </div>
+    <div class="offset-1 col-2">
+        @if (!OnLastPage())
+        {
+                <button class="btn btn-danger" type="button" @onclick="LoadNextPage" disabled="@LoadingNextPage">
+                @if (LoadingNextPage)
+                {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                }
+                    Next
+                </button>
+        }
+    </div>
+</div>
+
+@if (Pokemon.Count == 0)
+{
+        <div class="spinner-border text-danger" role="status">
+        </div>
+}
+else
+{
+    @for (var i = 0; i < Pokemon.Count; i = i + 3)
+    {
+                <div class="card-deck">
+                    <PokemonCard Pokemon=@GetPokemon(i) />
+                    <PokemonCard Pokemon=@GetPokemon(i+1) />
+                    <PokemonCard Pokemon=@GetPokemon(i+2) />
+                </div>
+    }
+}
+
+@code {
+    [Inject]
+    StateService StateService { get; set; }
+
+    //This injects the PokeClient from the dependency injection container
+    [Inject]
+    PokeApiClient PokeClient { get; set; }
+    //Main data model property for the Razor component
+    private List<Pokemon> Pokemon = new List<Pokemon>();
+
+    const int ItemsPerPage = 12;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPage();
+    }
+
+    //Helper method to retrieve an individual pokemon from the list of pokemon
+    private Pokemon GetPokemon(int index)
+    {
+        if (Pokemon.Count > index)
+            return Pokemon[index];
+        else
+            return null;
+    }
+
+    private async Task LoadPage()
+    {
+        if (Connectivity.Current.NetworkAccess == NetworkAccess.Internet)
+        {
+            //Get the list of pokemon resources 
+            var pageResponse = (await PokeClient.GetNamedResourcePageAsync<PokeApiNet.Pokemon>(
+                ItemsPerPage, (CurrentPage - 1) * ItemsPerPage));
+            TotalPokemon = pageResponse.Count;
+
+            //Create a list of tasks for calling getting the details of each pokemon from the list above
+            var tasks = pageResponse.Results
+                .Select(p => PokeClient.GetResourceAsync<PokeApiNet.Pokemon>(p.Name));
+
+            //Await all the tasks and set the data model for the page
+            Pokemon = (await Task.WhenAll(tasks)).ToList();
+        }
+        else
+        {
+            await App.Current.MainPage.DisplayAlert("Error",
+                "Internet connection required", "OK");
+        }
+
+    }
+
+    // this value gets overwritten after the first API call
+    int TotalPokemon = 932;
+
+    //Determines whether loading spinner for next page is displayed
+    bool LoadingNextPage = false;
+
+    //Determines whether loading spinner for previous page is displayed
+    bool LoadingPreviousPage = false;
+
+    int CurrentPage = 1;
+
+    //Evaluates whether we're on the last page of Pokemon
+    bool OnLastPage() => (CurrentPage * ItemsPerPage) >= TotalPokemon;
+
+    private async Task LoadNextPage()
+    {
+        LoadingNextPage = true;
+        CurrentPage++;
+        await LoadPage();
+        LoadingNextPage = false;
+    }
+
+    private async Task LoadPreviousPage()
+    {
+        LoadingPreviousPage = true;
+        CurrentPage--;
+        await LoadPage();
+        LoadingPreviousPage = false;
+    }
+}
